@@ -29,9 +29,19 @@
             <div style="font-weight:bold; color:#00ffcc;">⛵ VibeSail Toolbox</div>
             <button id="ap-collapse-toggle" style="background:#222; color:#ddd; border:1px solid #555; border-radius:3px; font-family:monospace; font-size:10px; padding:2px 6px; cursor:pointer;">+</button>
         </div>
+        <div style="margin-bottom:6px; display:flex; gap:6px; align-items:center;">
+            <button id="ap-helm-toggle" style="flex:1; background:#333; border:1px solid #555; color:#fff; padding:3px 8px; cursor:pointer; font-family:monospace; font-size:10px; border-radius:3px;">Toggle Helm Control (OFF)</button>
+            <button id="ap-sail-toggle" style="flex:1; background:#333; border:1px solid #555; color:#fff; padding:3px 8px; cursor:pointer; font-family:monospace; font-size:10px; border-radius:3px;">Toggle Sail Control (OFF)</button>
+        </div>
         <div id="ap-panel-body">
-        <div style="margin-bottom:4px;">[1] Helm Control: <span id="ap-helm-status" style="color:#ff4444; font-weight:bold;">OFF</span></div>
-        <div style="margin-bottom:4px;">[2] Sail Control: <span id="ap-sail-status" style="color:#ff4444; font-weight:bold;">OFF</span></div>
+        <div style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <span style="font-size:10px; color:#aaa;">HELM MODE</span>
+            <button id="ap-helm-mode-toggle" style="background:#333; border:1px solid #555; color:#fff; padding:2px 8px; cursor:pointer; font-family:monospace; font-size:10px; border-radius:3px; min-width:74px;">TARGET</button>
+        </div>
+        <div style="margin-bottom:6px; display:flex; gap:6px; align-items:center;">
+            <input id="ap-hold-heading-value" type="number" min="0" max="359" step="1" value="0" style="flex:1; background:#111; color:#fff; border:1px solid #444; font-family:monospace; font-size:10px; padding:3px;" disabled>
+            <button id="ap-hold-heading-apply" style="background:#333; border:1px solid #555; color:#fff; padding:3px 8px; cursor:pointer; font-family:monospace; font-size:10px; border-radius:3px;" disabled>Set Hold</button>
+        </div>
         <div style="margin-bottom:8px; text-align: center;">
             <button id="ap-btn-export" style="background:#a855f7; border:none; color:white; padding:4px 10px; cursor:pointer; font-family:monospace; font-size:11px; border-radius:3px; width:100%;">💾 Export VPP Table to JSON</button>
         </div>
@@ -42,6 +52,14 @@
                 <button id="ap-speed-toggle" style="background:#333; border:1px solid #555; color:#fff; padding:3px 8px; cursor:pointer; font-family:monospace; font-size:10px; border-radius:3px;">OFF</button>
             </div>
             <div id="ap-speed-status" style="font-size:10px; color:#888; margin-top:3px;">inactive</div>
+        </div>
+        <div style="margin-bottom:8px;">
+            <div style="font-size:10px; color:#aaa; margin-bottom:4px;">DRAG COEFFICIENT</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <input id="ap-drag-value" type="number" min="0" step="0.001" value="0.05" style="flex:1; background:#111; color:#fff; border:1px solid #444; font-family:monospace; font-size:10px; padding:3px;">
+                <button id="ap-drag-toggle" style="background:#333; border:1px solid #555; color:#fff; padding:3px 8px; cursor:pointer; font-family:monospace; font-size:10px; border-radius:3px;">OFF</button>
+            </div>
+            <div id="ap-drag-status" style="font-size:10px; color:#888; margin-top:3px;">inactive</div>
         </div>
         <div style="margin-bottom:8px;">
             <div style="font-size:10px; color:#aaa; margin-bottom:4px;">MONEY</div>
@@ -71,9 +89,15 @@
             </div>
         </div>
 
-        <div style="margin-top:8px;">
-            <div style="text-align:center; font-size:10px; color:#aaa; margin-bottom:4px;">HEADING TRACK (T/H)</div>
-            <canvas id="ap-angle-canvas" width="262" height="70" style="background:#111; border:1px solid #444;"></canvas>
+        <div style="margin-top:8px; display:flex; justify-content:space-between; gap:6px;">
+            <div>
+                <div style="text-align:center; font-size:10px; color:#aaa; margin-bottom:4px;">HEADING TRACK (T/H)</div>
+                <canvas id="ap-angle-canvas" width="128" height="70" style="background:#111; border:1px solid #444;"></canvas>
+            </div>
+            <div>
+                <div style="text-align:center; font-size:10px; color:#aaa; margin-bottom:4px;">RUDDER TRACK (R)</div>
+                <canvas id="ap-heel-rudder-canvas" width="128" height="70" style="background:#111; border:1px solid #444;"></canvas>
+            </div>
         </div>
 
         <hr style="border-color:#333; margin:8px 0;">
@@ -86,8 +110,11 @@
     document.body.appendChild(uiBox);
 
     // Frequently used HUD element handles
-    const elHelmStatus = document.getElementById('ap-helm-status');
-    const elSailStatus = document.getElementById('ap-sail-status');
+    const elHelmToggle = document.getElementById('ap-helm-toggle');
+    const elSailToggle = document.getElementById('ap-sail-toggle');
+    const elHelmModeToggle = document.getElementById('ap-helm-mode-toggle');
+    const elHoldHeadingValue = document.getElementById('ap-hold-heading-value');
+    const elHoldHeadingApply = document.getElementById('ap-hold-heading-apply');
     const elNavReadout = document.getElementById('ap-nav-readout');
     const elWindReadout = document.getElementById('ap-wind-readout');
     const elTrimReadout = document.getElementById('ap-trim-readout');
@@ -98,6 +125,9 @@
     const elSpeedValue = document.getElementById('ap-speed-value');
     const elSpeedToggle = document.getElementById('ap-speed-toggle');
     const elSpeedStatus = document.getElementById('ap-speed-status');
+    const elDragValue = document.getElementById('ap-drag-value');
+    const elDragToggle = document.getElementById('ap-drag-toggle');
+    const elDragStatus = document.getElementById('ap-drag-status');
     const elMoneyValue = document.getElementById('ap-money-value');
     const elMoneySet = document.getElementById('ap-money-set');
     const elMoneyStatus = document.getElementById('ap-money-status');
@@ -122,6 +152,7 @@
     const compassCtx = document.getElementById('ap-compass-canvas').getContext('2d');
     const graphCtx = document.getElementById('ap-graph-canvas').getContext('2d');
     const angleCtx = document.getElementById('ap-angle-canvas').getContext('2d');
+    const heelRudderCtx = document.getElementById('ap-heel-rudder-canvas').getContext('2d');
 
     function wrapSignedAngleDegrees(value) {
         let wrapped = ((value + 180) % 360);
@@ -137,7 +168,6 @@
 
     function readTelemetryFromSpeedometer(speedometerElement) {
         let currentHeading;
-        let relativeWind;
         let targetHeading;
 
         const allSpans = speedometerElement.querySelectorAll('span');
@@ -150,11 +180,6 @@
                 if (headingVal !== undefined) currentHeading = headingVal;
             }
 
-            if (relativeWind === undefined && /wind:/i.test(parentText)) {
-                const windVal = parseNumericDegrees(parentText);
-                if (windVal !== undefined) relativeWind = windVal;
-            }
-
             if (ownText === 'Target:') {
                 const valueSibling = span.nextElementSibling;
                 if (valueSibling) {
@@ -164,28 +189,107 @@
             }
         });
 
-        return { currentHeading, relativeWind, targetHeading };
+        return { currentHeading, targetHeading };
     }
 
-    function readCurrentSailAngle(svgElement) {
-        const gameSailPath = svgElement.querySelector('path[transform-origin="50 45"]');
-        if (!gameSailPath) return undefined;
+    function toDegreesMaybeRadians(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return undefined;
+        if (Math.abs(numeric) <= (2 * Math.PI + 0.001)) {
+            return numeric * (180 / Math.PI);
+        }
+        return numeric;
+    }
 
-        const transformAttr = gameSailPath.getAttribute('transform') || '';
-        const rotateMatch = transformAttr.match(/rotate\(([^)]+)\)/);
-        return rotateMatch ? parseFloat(rotateMatch[1]) : undefined;
+    function normalizeCompassDegrees(value) {
+        const degrees = toDegreesMaybeRadians(value);
+        if (degrees === undefined) return undefined;
+        let normalized = degrees % 360;
+        if (normalized < 0) normalized += 360;
+        return normalized;
+    }
+
+    function directionVectorToCompassDegrees(vec) {
+        if (!vec || typeof vec !== 'object') return undefined;
+        const x = Number(vec.x);
+        const z = Number(vec.z);
+        if (!Number.isFinite(x) || !Number.isFinite(z)) return undefined;
+        // Compass convention: 0deg at +Z, clockwise positive toward +X.
+        let degrees = Math.atan2(x, z) * (180 / Math.PI);
+        if (degrees < 0) degrees += 360;
+        return degrees;
+    }
+
+    function readDirectionDegrees(value) {
+        const scalar = normalizeCompassDegrees(value);
+        if (scalar !== undefined) return scalar;
+        return directionVectorToCompassDegrees(value);
+    }
+
+    function flipWindDirectionDegrees(direction) {
+        if (direction === undefined) return undefined;
+        return normalizeCompassDegrees(direction + 180);
+    }
+
+    function readDynamicsTelemetry(currentHeading) {
+        const dyn = window.sail?.boat?.dynamics;
+        const world = window.sail?.boat?.world;
+        if (!dyn) {
+            return {
+                heelAngle: undefined,
+                apparentWindDirection: undefined,
+                apparentWindAngle: undefined,
+                worldWindAngle: undefined,
+            };
+        }
+
+        const heelAngle = toDegreesMaybeRadians(dyn.heelAngle);
+        const apparentWindDirection = flipWindDirectionDegrees(readDirectionDegrees(dyn.apparentWindDirection));
+        const worldWindDirection = flipWindDirectionDegrees(readDirectionDegrees(world?.windDirection));
+
+        const apparentWindAngle = (apparentWindDirection !== undefined && currentHeading !== undefined)
+            ? wrapSignedAngleDegrees(apparentWindDirection - currentHeading)
+            : undefined;
+
+        const worldWindAngle = (worldWindDirection !== undefined && currentHeading !== undefined)
+            ? wrapSignedAngleDegrees(worldWindDirection - currentHeading)
+            : undefined;
+
+        return {
+            heelAngle,
+            apparentWindDirection,
+            apparentWindAngle,
+            worldWindAngle,
+        };
+    }
+
+    function readCurrentSailAngle(dyn) {
+        const sailAngleRad = Number(dyn?.sailAngle);
+        if (!Number.isFinite(sailAngleRad)) return undefined;
+        return Math.max(0, Math.min(Math.PI / 2, sailAngleRad)) * (180 / Math.PI);
+    }
+
+    function readCurrentSheetLimitAngle(dyn) {
+        const sheetLimitRad = Number(dyn?.sheetLimit);
+        if (!Number.isFinite(sheetLimitRad)) return undefined;
+        return Math.max(0, Math.min(Math.PI / 2, sheetLimitRad)) * (180 / Math.PI);
+    }
+
+    function setSheetLimitRadians(value) {
+        const dyn = window.sail?.boat?.dynamics;
+        if (!dyn) return;
+        const clamped = Math.max(0, Math.min(Math.PI / 2, Number(value)));
+        if (!Number.isFinite(clamped)) return;
+        dyn.sheetLimit = clamped;
     }
 
     // Automation System States
     let helmActive = false;
     let sailActive = false;
-    let isTrimPulsing = false;
-    let isHelmPulsing = false;
-    let isGybing = false;
+    let helmMode = 'target';
+    let helmHoldHeading = undefined;
 
     // Control State Memory
-    let lastTrimDirection = null;
-    let lastDirectionFlipTime = 0;
     let helmLastHeadingUnwrapped = null;
     let helmLastSampleTimeMs = 0;
     let helmTurnRateDps = 0;
@@ -193,36 +297,35 @@
     // Noise Filtering & Plotting Buffers
     let thrustHistory = [];
     const FILTER_WINDOW_SIZE = 6;
-    let filteredThrust = 0;
     let graphPoints = [];
     let headingTracePoints = [];
     let targetTracePoints = [];
+    let rudderTracePoints = [];
     let lastHeadingUnwrapped = null;
     let lastTargetUnwrapped = null;
     const MAX_GRAPH_POINTS = 65;
 
-    // Real-Time Optimization Parameters & Rate Limits
-    let baselineThrust = 0;
-    let optState = 'IDLE';
-    let optTimer = 0;
-    const STEP_SIZE = 0.2;
-    const OPT_TICK_DELAY = 10;
-    let lastOptFlipTime = 0;
-    const FLIP_COOLDOWN_MS = 600;
-    const OPT_IMPROVEMENT_THRESHOLD = 0.02;
-    let HELM_P_GAIN = 0.9;
-    const HELM_P_OUTPUT_FOR_MAX = 18;
-    let HELM_MAX_PULSE_MS = 32;
-    let HELM_MIN_PULSE_MS = 4;
+    // Helm control parameters
+    const HELM_P_GAIN = 0.45;
+    const HELM_P_OUTPUT_FOR_MAX = 30;
+    const HELM_RUDDER_SIGN = -1;
+    const HELM_RUDDER_EXPONENT = 0.65;
     const HELM_NEAR_TARGET_DEADBAND_DEG = 0.9;
     const HELM_TURN_RATE_FILTER_ALPHA = 0.35;
-    const HELM_TURN_LOOKAHEAD_SEC = 0.45;
+    const HELM_HOLD_STEP_DEG = 2;
+    const RUDDER_PHYSICAL_LIMIT = 0.52;
+    const RUDDER_COMMAND_LIMIT = 0.52;
 
     // Manual speed override controls
     let speedOverrideEnabled = false;
     let speedOverrideValue = 50.0;
     let speedOverrideDynRef = null;
     let speedOverrideOriginalDescriptor = null;
+    let dragOverrideEnabled = false;
+    let dragOverrideValue = 0.05;
+    let dragOverrideOriginalValue = null;
+    let dragOverrideHasOriginal = false;
+    let dragOverrideDynRef = null;
     let moneySetValue = 10000;
 
     // Adaptive VPP Profile Table
@@ -232,24 +335,32 @@
             "trim": 0
         },
         {
-            "awa": 30,
+            "awa": 25,
             "trim": 0
         },
         {
+            "awa": 30,
+            "trim": 6.66
+        },
+        {
+            "awa": 45,
+            "trim": 33.33
+        },
+        {
             "awa": 60,
-            "trim": 10
+            "trim": 36.66
         },
         {
             "awa": 90,
-            "trim": 20
+            "trim": 66.66
         },
         {
             "awa": 120,
-            "trim": 33.3333
+            "trim": 90
         },
         {
             "awa": 150,
-            "trim": 66.6666
+            "trim": 90
         },
         {
             "awa": 180,
@@ -271,32 +382,6 @@
             }
         }
         return 0;
-    }
-
-    function updateVppTable(currentAwa, offsetAdjustment) {
-        if (currentAwa <= 0) {
-            vppProfile[0].trim = Math.max(0, Math.min(90, vppProfile[0].trim + offsetAdjustment));
-            return;
-        }
-        if (currentAwa >= 180) {
-            vppProfile[vppProfile.length - 1].trim = Math.max(0, Math.min(90, vppProfile[vppProfile.length - 1].trim + offsetAdjustment));
-            return;
-        }
-
-        for (let i = 0; i < vppProfile.length - 1; i++) {
-            let p1 = vppProfile[i];
-            let p2 = vppProfile[i + 1];
-
-            if (currentAwa >= p1.awa && currentAwa <= p2.awa) {
-                let span = p2.awa - p1.awa;
-                let fraction2 = (currentAwa - p1.awa) / span;
-                let fraction1 = 1 - fraction2;
-
-                p1.trim = Math.max(0, Math.min(90, p1.trim + (offsetAdjustment * fraction1)));
-                p2.trim = Math.max(0, Math.min(90, p2.trim + (offsetAdjustment * fraction2)));
-                break;
-            }
-        }
     }
 
     // JSON Downloader Implementation
@@ -338,7 +423,7 @@
 
     function applySpeedOverride() {
         const dyn = window.sail?.boat?.dynamics;
-        if (!dyn) return false;
+        if (!dyn) return;
 
         if (speedOverrideDynRef !== dyn) {
             speedOverrideDynRef = dyn;
@@ -355,11 +440,10 @@
             configurable: true,
             enumerable: true,
         });
-        return true;
     }
 
     function removeSpeedOverride() {
-        if (!speedOverrideDynRef) return true;
+        if (!speedOverrideDynRef) return;
         try {
             if (speedOverrideOriginalDescriptor) {
                 Object.defineProperty(speedOverrideDynRef, 'speed', speedOverrideOriginalDescriptor);
@@ -368,9 +452,78 @@
             }
         } catch (err) {
             console.debug('Unable to restore original speed descriptor:', err);
-            return false;
         }
-        return true;
+    }
+
+    function parseDragOverrideInput() {
+        const parsed = Number(elDragValue.value);
+        if (Number.isFinite(parsed)) {
+            dragOverrideValue = Math.max(0, parsed);
+        }
+        elDragValue.value = dragOverrideValue.toFixed(3);
+    }
+
+    function updateDragOverrideUi() {
+        if (dragOverrideEnabled) {
+            elDragToggle.innerText = 'ON';
+            elDragToggle.style.background = '#0b6b2e';
+            elDragToggle.style.borderColor = '#1aa34a';
+            elDragStatus.innerText = `active @ ${dragOverrideValue.toFixed(3)}`;
+            elDragStatus.style.color = '#7dff9b';
+        } else {
+            elDragToggle.innerText = 'OFF';
+            elDragToggle.style.background = '#333';
+            elDragToggle.style.borderColor = '#555';
+            elDragStatus.innerText = 'inactive';
+            elDragStatus.style.color = '#888';
+        }
+    }
+
+    function applyDragOverride() {
+        const dyn = window.sail?.boat?.dynamics;
+        if (!dyn) return;
+
+        if (dragOverrideDynRef !== dyn) {
+            dragOverrideDynRef = dyn;
+            dragOverrideOriginalValue = Number(dyn.dragCoefficient);
+            dragOverrideHasOriginal = Number.isFinite(dragOverrideOriginalValue);
+        }
+
+        dyn.dragCoefficient = dragOverrideValue;
+    }
+
+    function removeDragOverride() {
+        if (!dragOverrideDynRef || !dragOverrideHasOriginal) return;
+        try {
+            dragOverrideDynRef.dragCoefficient = dragOverrideOriginalValue;
+        } catch (err) {
+            console.debug('Unable to restore dragCoefficient:', err);
+        }
+    }
+
+    function syncPassiveOverrideInputs() {
+        const dyn = window.sail?.boat?.dynamics;
+        if (!dyn) return;
+
+        if (!speedOverrideEnabled) {
+            const liveSpeed = Number(dyn.speed);
+            if (Number.isFinite(liveSpeed)) {
+                speedOverrideValue = Math.max(0, liveSpeed);
+                if (document.activeElement !== elSpeedValue) {
+                    elSpeedValue.value = speedOverrideValue.toFixed(0);
+                }
+            }
+        }
+
+        if (!dragOverrideEnabled) {
+            const liveDrag = Number(dyn.dragCoefficient);
+            if (Number.isFinite(liveDrag)) {
+                dragOverrideValue = Math.max(0, liveDrag);
+                if (document.activeElement !== elDragValue) {
+                    elDragValue.value = dragOverrideValue.toFixed(3);
+                }
+            }
+        }
     }
 
     elSpeedValue.addEventListener('change', parseSpeedOverrideInput);
@@ -387,6 +540,21 @@
         updateSpeedOverrideUi();
     });
     updateSpeedOverrideUi();
+
+    elDragValue.addEventListener('change', parseDragOverrideInput);
+    elDragValue.addEventListener('input', parseDragOverrideInput);
+    elDragToggle.addEventListener('click', () => {
+        parseDragOverrideInput();
+        if (dragOverrideEnabled) {
+            dragOverrideEnabled = false;
+            removeDragOverride();
+        } else {
+            dragOverrideEnabled = true;
+            applyDragOverride();
+        }
+        updateDragOverrideUi();
+    });
+    updateDragOverrideUi();
 
     function parseMoneyInput() {
         const parsed = Number(elMoneyValue.value);
@@ -413,75 +581,226 @@
     elMoneyValue.addEventListener('input', parseMoneyInput);
     elMoneySet.addEventListener('click', setMoneyAndReload);
 
-    // Key Listeners
-    window.addEventListener('keydown', (e) => {
-        if (e.key === '1') {
-            helmActive = !helmActive;
-            elHelmStatus.innerText = helmActive ? 'ACTIVE' : 'OFF';
-            elHelmStatus.style.color = helmActive ? '#00ff00' : '#ff4444';
-            if (!helmActive) {
-                sendKey('ArrowLeft', 'keyup');
-                sendKey('ArrowRight', 'keyup');
+    function readLiveCurrentHeading() {
+        const speedometer = document.getElementById('speedometer');
+        if (!speedometer) return undefined;
+        const { currentHeading } = readTelemetryFromSpeedometer(speedometer);
+        return currentHeading;
+    }
+
+    function collectFrameData(speedometerElement) {
+        const {
+            currentHeading,
+            targetHeading,
+        } = readTelemetryFromSpeedometer(speedometerElement);
+
+        const {
+            heelAngle,
+            apparentWindDirection,
+            apparentWindAngle,
+            worldWindAngle,
+        } = readDynamicsTelemetry(currentHeading);
+
+        const dyn = window.sail?.boat?.dynamics;
+        const currentSailAngle = readCurrentSailAngle(dyn);
+        const currentSheetLimitAngle = readCurrentSheetLimitAngle(dyn);
+        const rudderAngle = Number(dyn?.rudderAngle);
+
+        let instantThrust;
+        if (dyn?.forces) {
+            try {
+                const netForces = dyn.forces.net || {};
+                instantThrust = getVectorMagnitude(netForces.forward);
+            } catch (err) {
+                console.debug('Vector processing failure:', err);
             }
         }
-        if (e.key === '2') {
-            sailActive = !sailActive;
-            elSailStatus.innerText = sailActive ? 'ACTIVE' : 'OFF';
-            elSailStatus.style.color = sailActive ? '#00ff00' : '#ff4444';
-            if (!sailActive) {
-                sendKey('ArrowUp', 'keyup');
-                sendKey('ArrowDown', 'keyup');
-                isGybing = false;
+
+        return {
+            currentHeading,
+            targetHeading,
+            heelAngle,
+            apparentWindDirection,
+            apparentWindAngle,
+            worldWindAngle,
+            dyn,
+            currentSailAngle,
+            currentSheetLimitAngle,
+            rudderAngle,
+            instantThrust,
+        };
+    }
+
+    function updateThrustHistory(instantThrust) {
+        if (!Number.isFinite(instantThrust)) return;
+
+        thrustHistory.push(instantThrust);
+        if (thrustHistory.length > FILTER_WINDOW_SIZE) thrustHistory.shift();
+
+        const sum = thrustHistory.reduce((a, b) => a + b, 0);
+        const avgThrust = sum / thrustHistory.length;
+
+        elThrustReadout.innerText = `${avgThrust.toFixed(2)} N`;
+
+        graphPoints.push(avgThrust);
+        if (graphPoints.length > MAX_GRAPH_POINTS) graphPoints.shift();
+        renderThrustGraph();
+    }
+
+    function pushHeadingAndTargetTraces(currentHeading, helmControlTargetHeading) {
+        if (currentHeading !== undefined) {
+            lastHeadingUnwrapped = unwrapAngle(lastHeadingUnwrapped, currentHeading);
+            headingTracePoints.push(lastHeadingUnwrapped);
+        } else {
+            headingTracePoints.push(null);
+        }
+
+        if (helmControlTargetHeading !== undefined) {
+            // Keep target plotted on the same angular branch as heading to avoid mirror/opposite traces.
+            if (lastHeadingUnwrapped !== null && lastHeadingUnwrapped !== undefined) {
+                lastTargetUnwrapped = unwrapAngleNearReference(lastHeadingUnwrapped, helmControlTargetHeading);
+            } else {
+                lastTargetUnwrapped = unwrapAngle(lastTargetUnwrapped, helmControlTargetHeading);
+            }
+            targetTracePoints.push(lastTargetUnwrapped);
+        } else {
+            targetTracePoints.push(null);
+        }
+
+        if (headingTracePoints.length > MAX_GRAPH_POINTS) headingTracePoints.shift();
+        if (targetTracePoints.length > MAX_GRAPH_POINTS) targetTracePoints.shift();
+        renderAngleGraph();
+    }
+
+    function pushRudderTrace(rudderAngle) {
+        rudderTracePoints.push(Number.isFinite(rudderAngle) ? rudderAngle : null);
+        if (rudderTracePoints.length > MAX_GRAPH_POINTS) rudderTracePoints.shift();
+        renderHeelRudderGraph();
+    }
+
+    function updateHelmModeUi() {
+        const holdModeActive = helmMode === 'hold';
+        elHoldHeadingValue.disabled = !holdModeActive;
+        elHoldHeadingApply.disabled = !holdModeActive;
+        if (helmMode === 'hold') {
+            elHelmModeToggle.innerText = 'HOLD';
+            elHelmModeToggle.style.background = '#0b6b2e';
+            elHelmModeToggle.style.borderColor = '#1aa34a';
+            elHoldHeadingApply.style.background = '#0b6b2e';
+            elHoldHeadingApply.style.borderColor = '#1aa34a';
+        } else {
+            elHelmModeToggle.innerText = 'TARGET';
+            elHelmModeToggle.style.background = '#333';
+            elHelmModeToggle.style.borderColor = '#555';
+            elHoldHeadingApply.style.background = '#333';
+            elHoldHeadingApply.style.borderColor = '#555';
+        }
+    }
+
+    function setHoldHeadingFromValue(rawValue) {
+        const parsed = Number(rawValue);
+        if (!Number.isFinite(parsed)) return false;
+        helmHoldHeading = normalizeCompassDegrees(parsed);
+        elHoldHeadingValue.value = helmHoldHeading.toFixed(0);
+        return true;
+    }
+
+    function syncHoldHeadingInput() {
+        if (helmMode !== 'hold') return;
+        if (!Number.isFinite(helmHoldHeading)) return;
+        if (document.activeElement === elHoldHeadingValue) return;
+        elHoldHeadingValue.value = helmHoldHeading.toFixed(0);
+    }
+
+    function updateHelmStatusUi() {
+        elHelmToggle.innerText = helmActive ? 'Toggle Helm Control (ACTIVE)' : 'Toggle Helm Control (OFF)';
+        elHelmToggle.style.background = helmActive ? '#0b6b2e' : '#333';
+        elHelmToggle.style.borderColor = helmActive ? '#1aa34a' : '#555';
+    }
+
+    function updateSailStatusUi() {
+        elSailToggle.innerText = sailActive ? 'Toggle Sail Control (ACTIVE)' : 'Toggle Sail Control (OFF)';
+        elSailToggle.style.background = sailActive ? '#0b6b2e' : '#333';
+        elSailToggle.style.borderColor = sailActive ? '#1aa34a' : '#555';
+    }
+
+    function toggleHelmControl() {
+        helmActive = !helmActive;
+        if (helmActive && helmMode === 'hold') {
+            const liveHeading = readLiveCurrentHeading();
+            if (liveHeading !== undefined) {
+                helmHoldHeading = normalizeCompassDegrees(liveHeading);
+            }
+        }
+        if (!helmActive) {
+            setRudderAngle(0);
+        }
+        updateHelmStatusUi();
+    }
+
+    function toggleSailControl() {
+        sailActive = !sailActive;
+        updateSailStatusUi();
+    }
+
+    elHelmModeToggle.addEventListener('click', () => {
+        helmMode = (helmMode === 'target') ? 'hold' : 'target';
+        if (helmMode === 'hold') {
+            const liveHeading = readLiveCurrentHeading();
+            if (liveHeading !== undefined) {
+                helmHoldHeading = normalizeCompassDegrees(liveHeading);
+            }
+            if (Number.isFinite(helmHoldHeading)) {
+                elHoldHeadingValue.value = helmHoldHeading.toFixed(0);
+            }
+        }
+        updateHelmModeUi();
+    });
+    updateHelmModeUi();
+
+    elHoldHeadingApply.addEventListener('click', () => {
+        setHoldHeadingFromValue(elHoldHeadingValue.value);
+    });
+    elHoldHeadingValue.addEventListener('change', () => {
+        setHoldHeadingFromValue(elHoldHeadingValue.value);
+    });
+    elHoldHeadingValue.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            setHoldHeadingFromValue(elHoldHeadingValue.value);
+            e.preventDefault();
+        }
+    });
+
+    elHelmToggle.addEventListener('click', toggleHelmControl);
+    elSailToggle.addEventListener('click', toggleSailControl);
+    updateHelmStatusUi();
+    updateSailStatusUi();
+
+    // Key Listeners
+    window.addEventListener('keydown', (e) => {
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && helmMode === 'hold') {
+            let baseHeading = helmHoldHeading;
+            if (!Number.isFinite(baseHeading)) {
+                const liveHeading = readLiveCurrentHeading();
+                if (liveHeading !== undefined) {
+                    baseHeading = normalizeCompassDegrees(liveHeading);
+                }
+            }
+
+            if (Number.isFinite(baseHeading)) {
+                const signedStep = (e.key === 'ArrowLeft') ? -HELM_HOLD_STEP_DEG : HELM_HOLD_STEP_DEG;
+                helmHoldHeading = normalizeCompassDegrees(baseHeading + signedStep);
+                elHoldHeadingValue.value = helmHoldHeading.toFixed(0);
+                e.preventDefault();
             }
         }
     });
 
-    function sendKey(keyName, type) {
-        let code = 0;
-        if (keyName === 'ArrowUp') code = 38;
-        else if (keyName === 'ArrowDown') code = 40;
-        else if (keyName === 'ArrowLeft') code = 37;
-        else if (keyName === 'ArrowRight') code = 39;
-
-        const event = new KeyboardEvent(type, {
-            key: keyName, keyCode: code, which: code, code: keyName, bubbles: true, cancelable: true, view: window
-        });
-        document.dispatchEvent(event);
-        const canvas = document.querySelector('canvas');
-        if (canvas) canvas.dispatchEvent(event);
-    }
-
-    function pulseTrim(keyName, duration) {
-        isTrimPulsing = true;
-        sendKey(keyName, 'keydown');
-        setTimeout(() => {
-            sendKey(keyName, 'keyup');
-            setTimeout(() => { isTrimPulsing = false; }, 80);
-        }, duration);
-    }
-
-    function pulseHelm(keyName, duration) {
-        isHelmPulsing = true;
-        sendKey(keyName, 'keydown');
-        setTimeout(() => {
-            sendKey(keyName, 'keyup');
-            setTimeout(() => { isHelmPulsing = false; }, 30);
-        }, duration);
-    }
-
-    function drawVisualTarget(svgElement, targetRotation) {
-        let targetPath = document.getElementById('ap-visual-target');
-        if (!targetPath) {
-            targetPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            targetPath.setAttribute('id', 'ap-visual-target');
-            targetPath.setAttribute('d', 'M 50 15 L 52 45 L 48 45 Z');
-            targetPath.setAttribute('fill', 'rgba(0, 240, 255, 0.4)');
-            targetPath.setAttribute('stroke', '#00f0ff');
-            targetPath.setAttribute('stroke-width', '0.5');
-            targetPath.setAttribute('transform-origin', '50 45');
-            svgElement.appendChild(targetPath);
-        }
-        targetPath.setAttribute('transform', `rotate(${targetRotation})`);
+    function setRudderAngle(value) {
+        const dyn = window.sail?.boat?.dynamics;
+        if (!dyn) return;
+        const clamped = Math.max(-RUDDER_COMMAND_LIMIT, Math.min(RUDDER_COMMAND_LIMIT, value));
+        dyn.rudderAngle = clamped;
     }
 
     const getVectorMagnitude = (vec) => {
@@ -502,8 +821,18 @@
         return previousUnwrapped + delta;
     }
 
-    function renderTacticalCompass(hdg, trg, awa, sail, trgSail) {
-        const cx = 65, cy = 65, r = 55;
+    function unwrapAngleNearReference(referenceUnwrapped, currentWrapped) {
+        if (referenceUnwrapped === null || referenceUnwrapped === undefined) return currentWrapped;
+        let aligned = currentWrapped;
+        while ((aligned - referenceUnwrapped) > 180) aligned -= 360;
+        while ((aligned - referenceUnwrapped) < -180) aligned += 360;
+        return aligned;
+    }
+
+    function renderTacticalCompass(hdg, trg, apparentWindAngle, worldWindAngle, apparentWindDirection, sail, trgSail) {
+        const cx = 65, cy = 65;
+        const outerR = 55;
+        const innerR = 45;
         compassCtx.clearRect(0, 0, 130, 130);
 
         compassCtx.save();
@@ -524,9 +853,15 @@
         compassCtx.restore();
 
         compassCtx.beginPath();
-        compassCtx.arc(cx, cy, r, 0, 2 * Math.PI);
+        compassCtx.arc(cx, cy, outerR, 0, 2 * Math.PI);
         compassCtx.strokeStyle = '#333';
         compassCtx.lineWidth = 2;
+        compassCtx.stroke();
+
+        compassCtx.beginPath();
+        compassCtx.arc(cx, cy, innerR, 0, 2 * Math.PI);
+        compassCtx.strokeStyle = '#2a2a2a';
+        compassCtx.lineWidth = 1;
         compassCtx.stroke();
 
         const drawNeedle = (relativeAngleDegrees, len, color, width, isArrow = false) => {
@@ -550,17 +885,57 @@
             }
         };
 
+        const drawRingAnnotation = (angleDeg, color, label) => {
+            const rad = (-angleDeg - 90) * Math.PI / 180;
+            const x1 = cx + innerR * Math.cos(rad);
+            const y1 = cy + innerR * Math.sin(rad);
+            const x2 = cx + outerR * Math.cos(rad);
+            const y2 = cy + outerR * Math.sin(rad);
+
+            compassCtx.beginPath();
+            compassCtx.moveTo(x1, y1);
+            compassCtx.lineTo(x2, y2);
+            compassCtx.strokeStyle = color;
+            compassCtx.lineWidth = 2;
+            compassCtx.lineCap = 'round';
+            compassCtx.stroke();
+
+            const labelR = outerR + 7;
+            const tx = cx + labelR * Math.cos(rad);
+            const ty = cy + labelR * Math.sin(rad);
+            compassCtx.font = '8px monospace';
+            compassCtx.fillStyle = color;
+            compassCtx.textAlign = 'center';
+            compassCtx.textBaseline = 'middle';
+            compassCtx.fillText(label, tx, ty);
+        };
+
         let currentHdgSafe = (hdg !== undefined) ? hdg : 0;
 
-        drawNeedle(0, r - 10, '#ffffff', 2.5);
+        const apparentMarkerAngle = (apparentWindAngle !== undefined)
+            ? apparentWindAngle
+            : (apparentWindDirection !== undefined ? wrapSignedAngleDegrees(apparentWindDirection - currentHdgSafe) : undefined);
+
+        if (apparentMarkerAngle !== undefined) {
+            drawRingAnnotation(apparentMarkerAngle, '#ff66ff', 'A');
+        }
+        if (worldWindAngle !== undefined) {
+            drawRingAnnotation(worldWindAngle, '#66b3ff', 'W');
+        }
+
+        drawNeedle(0, innerR - 2, '#ffffff', 2.5);
 
         if (trg !== undefined) {
             let relativeTargetAngle = trg - currentHdgSafe;
-            drawNeedle(relativeTargetAngle, r - 2, '#ffd166', 2);
+            drawNeedle(relativeTargetAngle, outerR - 2, '#ffd166', 2);
         }
 
-        if (awa !== undefined) {
-            drawNeedle(awa, r - 5, '#ff66ff', 2, true);
+        if (worldWindAngle !== undefined) {
+            drawNeedle(worldWindAngle, innerR - 2, '#66b3ff', 1.6, true);
+        }
+
+        if (apparentWindAngle !== undefined) {
+            drawNeedle(apparentWindAngle, innerR + 1, '#ff66ff', 2, true);
         }
 
         if (sail !== undefined && trgSail !== undefined) {
@@ -569,8 +944,8 @@
             let compassSailPos = -sail;
             let compassTargetSailPos = -trgSail;
 
-            drawNeedle(compassSailPos, r - 18, '#00ffcc', 3);
-            drawNeedle(compassTargetSailPos, r - 18, 'rgba(0, 240, 255, 0.5)', 1.5, true);
+            drawNeedle(compassSailPos, innerR - 12, '#00ffcc', 3);
+            drawNeedle(compassTargetSailPos, innerR - 12, 'rgba(0, 240, 255, 0.5)', 1.5, true);
         }
 
         compassCtx.beginPath();
@@ -614,7 +989,9 @@
     }
 
     function renderAngleGraph() {
-        angleCtx.clearRect(0, 0, 262, 70);
+        const width = angleCtx.canvas.width;
+        const height = angleCtx.canvas.height;
+        angleCtx.clearRect(0, 0, width, height);
 
         const angleValues = [];
         for (let i = 0; i < headingTracePoints.length; i++) {
@@ -634,14 +1011,14 @@
         }
 
         const top = 4;
-        const bottom = 66;
+        const bottom = height - 4;
         angleCtx.strokeStyle = '#222';
         angleCtx.lineWidth = 1;
         for (let i = 1; i < 3; i++) {
             const y = top + ((bottom - top) / 3) * i;
             angleCtx.beginPath();
             angleCtx.moveTo(0, y);
-            angleCtx.lineTo(262, y);
+            angleCtx.lineTo(width, y);
             angleCtx.stroke();
         }
 
@@ -654,7 +1031,7 @@
                     drawing = false;
                     continue;
                 }
-                const x = (262 / (MAX_GRAPH_POINTS - 1)) * i;
+                const x = (width / (MAX_GRAPH_POINTS - 1)) * i;
                 const ratio = (v - aMin) / (aMax - aMin);
                 const y = bottom - ratio * (bottom - top);
                 if (!drawing) {
@@ -679,73 +1056,146 @@
         angleCtx.fillText('H', 14, 11);
     }
 
+    function renderHeelRudderGraph() {
+        const width = heelRudderCtx.canvas.width;
+        const height = heelRudderCtx.canvas.height;
+        heelRudderCtx.clearRect(0, 0, width, height);
+
+        const hasRudderData = rudderTracePoints.some(v => v !== null && v !== undefined);
+        if (!hasRudderData) return;
+
+        // Keep rudder axis fixed so visual amplitude is stable over time.
+        const minV = -RUDDER_PHYSICAL_LIMIT;
+        const maxV = RUDDER_PHYSICAL_LIMIT;
+
+        const top = 4;
+        const bottom = height - 4;
+        heelRudderCtx.strokeStyle = '#222';
+        heelRudderCtx.lineWidth = 1;
+        for (let i = 1; i < 3; i++) {
+            const y = top + ((bottom - top) / 3) * i;
+            heelRudderCtx.beginPath();
+            heelRudderCtx.moveTo(0, y);
+            heelRudderCtx.lineTo(width, y);
+            heelRudderCtx.stroke();
+        }
+
+        const yZero = bottom - ((0 - minV) / (maxV - minV)) * (bottom - top);
+        heelRudderCtx.beginPath();
+        heelRudderCtx.moveTo(0, yZero);
+        heelRudderCtx.lineTo(width, yZero);
+        heelRudderCtx.strokeStyle = '#2f2f2f';
+        heelRudderCtx.lineWidth = 1;
+        heelRudderCtx.stroke();
+
+        const drawSeries = (points, color) => {
+            heelRudderCtx.beginPath();
+            let drawing = false;
+            for (let i = 0; i < points.length; i++) {
+                const v = points[i];
+                if (v === null || v === undefined) {
+                    drawing = false;
+                    continue;
+                }
+                const x = (width / (MAX_GRAPH_POINTS - 1)) * i;
+                const ratio = (v - minV) / (maxV - minV);
+                const y = bottom - ratio * (bottom - top);
+                if (!drawing) {
+                    heelRudderCtx.moveTo(x, y);
+                    drawing = true;
+                } else {
+                    heelRudderCtx.lineTo(x, y);
+                }
+            }
+            heelRudderCtx.strokeStyle = color;
+            heelRudderCtx.lineWidth = 1.6;
+            heelRudderCtx.stroke();
+        };
+
+        drawSeries(rudderTracePoints, '#66b3ff');
+
+        let latestRudder = null;
+        for (let i = rudderTracePoints.length - 1; i >= 0; i--) {
+            const v = rudderTracePoints[i];
+            if (v !== null && v !== undefined) {
+                latestRudder = v;
+                break;
+            }
+        }
+
+        heelRudderCtx.fillStyle = '#66b3ff';
+        heelRudderCtx.font = '9px monospace';
+        heelRudderCtx.textAlign = 'left';
+        heelRudderCtx.fillText('R', 14, 11);
+
+        if (latestRudder !== null) {
+            heelRudderCtx.textAlign = 'right';
+            heelRudderCtx.fillText(`R ${latestRudder.toFixed(2)}`, width - 4, 11);
+        }
+    }
+
     // Master operational frame loop (Runs every 80ms)
     setInterval(() => {
+        syncPassiveOverrideInputs();
+
         if (speedOverrideEnabled) {
             applySpeedOverride();
+        }
+        if (dragOverrideEnabled) {
+            applyDragOverride();
         }
 
         const speedometer = document.getElementById('speedometer');
         if (!speedometer) return;
 
-        const svgElement = speedometer.querySelector('svg');
-        if (!svgElement) return;
-
+        const frameData = collectFrameData(speedometer);
         const {
             currentHeading,
-            relativeWind,
             targetHeading,
-        } = readTelemetryFromSpeedometer(speedometer);
+            heelAngle,
+            apparentWindDirection,
+            apparentWindAngle,
+            worldWindAngle,
+            dyn,
+            currentSailAngle,
+            currentSheetLimitAngle,
+            rudderAngle,
+            instantThrust,
+        } = frameData;
 
-        const currentSailAngle = readCurrentSailAngle(svgElement);
-
-        const dyn = window.sail?.boat?.dynamics;
-        if (dyn && dyn.forces) {
-            try {
-                const netForces = dyn.forces.net || {};
-                let instantThrust = getVectorMagnitude(netForces.forward);
-
-                thrustHistory.push(instantThrust);
-                if (thrustHistory.length > FILTER_WINDOW_SIZE) thrustHistory.shift();
-
-                let sum = thrustHistory.reduce((a, b) => a + b, 0);
-                filteredThrust = sum / thrustHistory.length;
-
-                elThrustReadout.innerText = filteredThrust.toFixed(2) + ' N';
-
-                graphPoints.push(filteredThrust);
-                if (graphPoints.length > MAX_GRAPH_POINTS) graphPoints.shift();
-                renderThrustGraph();
-            } catch (err) {
-                console.debug("Vector processing failure:", err);
-            }
+        if (helmMode === 'hold' && !Number.isFinite(helmHoldHeading) && currentHeading !== undefined) {
+            helmHoldHeading = normalizeCompassDegrees(currentHeading);
+            elHoldHeadingValue.value = helmHoldHeading.toFixed(0);
         }
 
-        let displayTarget = (targetHeading !== undefined) ? `${targetHeading.toFixed(0)}°` : '--°';
+        syncHoldHeadingInput();
+
+        const helmControlTargetHeading = (helmMode === 'hold' && Number.isFinite(helmHoldHeading))
+            ? helmHoldHeading
+            : targetHeading;
+
+        const trimReadoutCurrent = Number.isFinite(currentSheetLimitAngle) ? `${currentSheetLimitAngle.toFixed(1)}°` : '--°';
+        const trimReadoutTarget = (apparentWindAngle !== undefined)
+            ? `${getVppTargetTrim(Math.abs(apparentWindAngle)).toFixed(1)}°`
+            : '--°';
+        elTrimReadout.innerText = `${trimReadoutCurrent}/${trimReadoutTarget}`;
+        updateThrustHistory(instantThrust);
+
+        let displayTarget = (helmControlTargetHeading !== undefined) ? `${helmControlTargetHeading.toFixed(0)}°` : '--°';
         let displayHeading = (currentHeading !== undefined) ? `${currentHeading.toFixed(0)}°` : '--°';
         elNavReadout.innerText = `${displayHeading}/${displayTarget}`;
 
-        if (relativeWind !== undefined) {
-            elWindReadout.innerText = `${relativeWind.toFixed(0)}°`;
-        }
-
-        if (currentHeading !== undefined) {
-            lastHeadingUnwrapped = unwrapAngle(lastHeadingUnwrapped, currentHeading);
-            headingTracePoints.push(lastHeadingUnwrapped);
+        const heelText = (heelAngle !== undefined) ? ` | H ${heelAngle.toFixed(1)}°` : '';
+        if (apparentWindAngle !== undefined) {
+            elWindReadout.innerText = `${apparentWindAngle.toFixed(0)}°${heelText}`;
+        } else if (apparentWindDirection !== undefined) {
+            elWindReadout.innerText = `Dir ${apparentWindDirection.toFixed(0)}°${heelText}`;
         } else {
-            headingTracePoints.push(null);
+            elWindReadout.innerText = `--°${heelText}`;
         }
 
-        if (targetHeading !== undefined) {
-            lastTargetUnwrapped = unwrapAngle(lastTargetUnwrapped, targetHeading);
-            targetTracePoints.push(lastTargetUnwrapped);
-        } else {
-            targetTracePoints.push(null);
-        }
-
-        if (headingTracePoints.length > MAX_GRAPH_POINTS) headingTracePoints.shift();
-        if (targetTracePoints.length > MAX_GRAPH_POINTS) targetTracePoints.shift();
-        renderAngleGraph();
+        pushHeadingAndTargetTraces(currentHeading, helmControlTargetHeading);
+        pushRudderTrace(rudderAngle);
 
         // ==========================================
         // AXIS 1: HELM STEERING (Proportional + Dead Zone)
@@ -766,39 +1216,41 @@
             helmLastSampleTimeMs = nowMs;
         }
 
-        if (helmActive && currentHeading !== undefined && targetHeading !== undefined && !isHelmPulsing) {
-            const predictedHeading = currentHeading + (helmTurnRateDps * HELM_TURN_LOOKAHEAD_SEC);
-            let headingError = targetHeading - predictedHeading;
+        if (helmActive && currentHeading !== undefined && helmControlTargetHeading !== undefined) {
+            let headingError = helmControlTargetHeading - currentHeading;
             headingError = wrapSignedAngleDegrees(headingError);
 
-            let absHelmError = Math.abs(headingError);
-
-            if (absHelmError < HELM_NEAR_TARGET_DEADBAND_DEG) {
+            if (Math.abs(headingError) < HELM_NEAR_TARGET_DEADBAND_DEG) {
                 helmActionEl.innerText = "On Course";
                 helmActionEl.style.color = '#00ff00';
-                sendKey('ArrowLeft', 'keyup');
-                sendKey('ArrowRight', 'keyup');
+                setRudderAngle(0);
             } else {
                 const pOutput = HELM_P_GAIN * headingError;
                 const absOutput = Math.abs(pOutput);
                 const outputRatio = Math.min(1, absOutput / HELM_P_OUTPUT_FOR_MAX);
-                const helmPulseWidthMs = Math.max(HELM_MIN_PULSE_MS, Math.round(HELM_MIN_PULSE_MS + outputRatio * (HELM_MAX_PULSE_MS - HELM_MIN_PULSE_MS)));
+                const curvedRatio = Math.pow(outputRatio, HELM_RUDDER_EXPONENT);
+                const rudderCmd = HELM_RUDDER_SIGN * Math.sign(pOutput) * curvedRatio;
 
                 if (pOutput > 0) {
-                    helmActionEl.innerText = `P Left [${helmPulseWidthMs}ms | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
+                    helmActionEl.innerText = `P Left [rudder ${rudderCmd.toFixed(2)} | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
                     helmActionEl.style.color = '#3399ff';
-                    pulseHelm('ArrowLeft', helmPulseWidthMs);
                 } else {
-                    helmActionEl.innerText = `P Right [${helmPulseWidthMs}ms | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
+                    helmActionEl.innerText = `P Right [rudder ${rudderCmd.toFixed(2)} | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
                     helmActionEl.style.color = '#ffd166';
-                    pulseHelm('ArrowRight', helmPulseWidthMs);
                 }
+                setRudderAngle(rudderCmd);
             }
-        } else if (!helmActive) {
+        } else if (helmActive) {
+            setRudderAngle(0);
+            helmActionEl.innerText = (helmMode === 'hold') ? "Waiting for Hold Heading..." : "Waiting for Race Target...";
+            helmActionEl.style.color = '#666';
+        } else {
             helmLastHeadingUnwrapped = null;
             helmLastSampleTimeMs = 0;
             helmTurnRateDps = 0;
-            helmActionEl.innerText = (targetHeading === undefined) ? "Waiting for Race Target..." : "Disabled";
+            helmActionEl.innerText = (helmControlTargetHeading === undefined)
+                ? ((helmMode === 'hold') ? "Waiting for Hold Heading..." : "Waiting for Race Target...")
+                : "Disabled";
             helmActionEl.style.color = '#666';
         }
 
@@ -806,139 +1258,49 @@
         // AXIS 2: SAIL TRIMMING ENGINE & REAL-TIME OPTIMIZATION
         // ==========================================
         const trimActionEl = elTrimAction;
-        if (currentSailAngle !== undefined && relativeWind !== undefined) {
-            let absWindFromNose = Math.abs(relativeWind);
-            let currentExtension = Math.abs(180 - currentSailAngle);
-
-            // Real-time hill-climbing algorithm updates the profile array natively
-            if (sailActive && !isGybing) {
-                optTimer++;
-                if (optTimer >= OPT_TICK_DELAY) {
-                    optTimer = 0;
-                    let now = Date.now();
-
-                    if (optState === 'IDLE') {
-                        baselineThrust = filteredThrust;
-                        optState = 'TESTING_UP';
-                        updateVppTable(absWindFromNose, STEP_SIZE);
-                    }
-                    else if (optState === 'TESTING_UP') {
-                        optState = 'EVALUATING_UP';
-                    }
-                    else if (optState === 'EVALUATING_UP') {
-                        if (filteredThrust > baselineThrust + OPT_IMPROVEMENT_THRESHOLD) {
-                            baselineThrust = filteredThrust;
-                            updateVppTable(absWindFromNose, STEP_SIZE);
-                            optState = 'TESTING_UP';
-                        } else {
-                            if (now - lastOptFlipTime > FLIP_COOLDOWN_MS) {
-                                lastOptFlipTime = now;
-                                // Revert the previous +STEP probe before trying the opposite direction.
-                                updateVppTable(absWindFromNose, -STEP_SIZE);
-                                updateVppTable(absWindFromNose, -STEP_SIZE);
-                                optState = 'TESTING_DOWN';
-                            } else {
-                                optState = 'IDLE';
-                            }
-                        }
-                    }
-                    else if (optState === 'TESTING_DOWN') {
-                        optState = 'EVALUATING_DOWN';
-                    }
-                    else if (optState === 'EVALUATING_DOWN') {
-                        if (filteredThrust > baselineThrust + OPT_IMPROVEMENT_THRESHOLD) {
-                            baselineThrust = filteredThrust;
-                            updateVppTable(absWindFromNose, -STEP_SIZE);
-                            optState = 'TESTING_DOWN';
-                        } else {
-                            if (now - lastOptFlipTime > FLIP_COOLDOWN_MS) {
-                                lastOptFlipTime = now;
-                                // Revert the previous -STEP probe and return to idle.
-                                updateVppTable(absWindFromNose, STEP_SIZE);
-                                optState = 'IDLE';
-                            } else {
-                                optState = 'IDLE';
-                            }
-                        }
-                    }
-                }
-            }
+        if (currentSailAngle !== undefined && apparentWindAngle !== undefined) {
+            let absWindFromNose = Math.abs(apparentWindAngle);
+            let currentExtension = currentSailAngle;
 
             let targetExtension = getVppTargetTrim(absWindFromNose);
-            let targetRotation = (relativeWind >= 0) ? (180 - targetExtension) : (180 + targetExtension);
+            let targetRotation = (apparentWindAngle >= 0) ? (180 - targetExtension) : (180 + targetExtension);
+            let currentRotation = (apparentWindAngle >= 0) ? (180 - currentExtension) : (180 + currentExtension);
 
-            drawVisualTarget(svgElement, targetRotation);
-            elTrimReadout.innerText = `${currentSailAngle.toFixed(1)}°/${targetRotation.toFixed(1)}°`;
-            renderTacticalCompass(currentHeading, targetHeading, relativeWind, currentSailAngle, targetRotation);
+            renderTacticalCompass(currentHeading, helmControlTargetHeading, apparentWindAngle, worldWindAngle, apparentWindDirection, currentRotation, targetRotation);
 
             if (sailActive) {
-                if (!isGybing && absWindFromNose > 90) {
-                    let wrongSide = false;
-                    if (relativeWind >= 0 && currentSailAngle > 180.5) wrongSide = true;
-                    if (relativeWind < 0 && currentSailAngle < 179.5) wrongSide = true;
+                const error = targetExtension - currentExtension;
+                const absError = Math.abs(error);
 
-                    let deviationAmount = Math.abs(180 - currentSailAngle);
-                    if (wrongSide && deviationAmount > 20.0) {
-                        isGybing = true;
-                        sendKey('ArrowUp', 'keyup');
-                        sendKey('ArrowDown', 'keyup');
-                    }
-                }
+                // Command the final trim target directly instead of stepping toward it.
+                setSheetLimitRadians(targetExtension * (Math.PI / 180));
 
-                if (isGybing) {
-                    let currentDeviation = Math.abs(180 - currentSailAngle);
-                    if (currentDeviation > 2.0) {
-                        trimActionEl.innerText = "🚨 GYBE RECOVERY: Centerline Lock";
-                        trimActionEl.style.color = '#ff3333';
-                        sendKey('ArrowDown', 'keydown');
-                        return;
+                if (absError <= 1.2) {
+                    trimActionEl.innerText = `On Target`;
+                    trimActionEl.style.color = '#00f0ff';
+                } else {
+                    if (error > 0) {
+                        trimActionEl.innerText = `Releasing via sheetLimit -> ${targetExtension.toFixed(1)}°`;
+                        trimActionEl.style.color = '#00ffcc';
                     } else {
-                        sendKey('ArrowDown', 'keyup');
-                        isGybing = false;
+                        trimActionEl.innerText = `Trimming via sheetLimit -> ${targetExtension.toFixed(1)}°`;
+                        trimActionEl.style.color = '#ffaa00';
                     }
                 }
-
-                if (!isTrimPulsing) {
-                    let error = targetExtension - currentExtension;
-                    let absError = Math.abs(error);
-
-                    if (absError <= 1.2) {
-                        trimActionEl.innerText = `Adapting VPP... [${optState}]`;
-                        trimActionEl.style.color = '#00f0ff';
-                    } else {
-                        let currentDir = error > 0 ? 'Up' : 'Down';
-                        let currentTime = Date.now();
-
-                        if (lastTrimDirection && currentDir !== lastTrimDirection) {
-                            let timeSinceFlip = currentTime - lastDirectionFlipTime;
-                            if (timeSinceFlip < 550) {
-                                trimActionEl.innerText = `⏳ Rate Limiting Chattering (${(540 - timeSinceFlip)}ms)`;
-                                trimActionEl.style.color = '#ffaa00';
-                                return;
-                            }
-                            lastDirectionFlipTime = currentTime;
-                        }
-
-                        lastTrimDirection = currentDir;
-
-                        let duration = 15;
-                        if (absError > 10.0) duration = 50;
-                        else if (absError > 4.0) duration = 30;
-
-                        if (error > 0) {
-                            trimActionEl.innerText = `Releasing Smooth (ArrowUp) [${duration}ms]`;
-                            trimActionEl.style.color = '#00ffcc';
-                            pulseTrim('ArrowUp', duration);
-                        } else {
-                            trimActionEl.innerText = `Trimming Smooth (ArrowDown) [${duration}ms]`;
-                            trimActionEl.style.color = '#ffaa00';
-                            pulseTrim('ArrowDown', duration);
-                        }
-                    }
-                }
-            } else if (!sailActive) {
+            } else {
                 trimActionEl.innerText = "Disabled";
                 trimActionEl.style.color = '#666';
+            }
+        } else {
+            // Keep compass active even when sail telemetry is temporarily unavailable.
+            renderTacticalCompass(currentHeading, helmControlTargetHeading, apparentWindAngle, worldWindAngle, apparentWindDirection, currentSailAngle, undefined);
+
+            if (!sailActive) {
+                trimActionEl.innerText = "Disabled";
+                trimActionEl.style.color = '#666';
+            } else {
+                trimActionEl.innerText = "Waiting for Wind/Sail Telemetry...";
+                trimActionEl.style.color = '#888';
             }
         }
 
