@@ -81,7 +81,7 @@
         <div style="display: flex; justify-content: space-between; margin-top:10px; border-top:1px solid #333; padding-top:10px;">
             <div>
                 <div style="text-align:center; font-size:10px; color:#aaa; margin-bottom:4px;">HEADING-UP COMPASS</div>
-                <canvas id="ap-compass-canvas" width="130" height="130" style="background:#111; border-radius:50%; border:1px solid #444;"></canvas>
+                <canvas id="ap-compass-canvas" width="130" height="130" style="background:#111; border-radius:50%; border:1px solid #333;"></canvas>
             </div>
             <div>
                 <div style="text-align:center; font-size:10px; color:#aaa; margin-bottom:4px;">THRUST HISTORY</div>
@@ -293,6 +293,8 @@
     let helmLastHeadingUnwrapped = null;
     let helmLastSampleTimeMs = 0;
     let helmTurnRateDps = 0;
+    let helmLastControlTimeMs = 0;
+    let helmBiasRudder = 0;
 
     // Noise Filtering & Plotting Buffers
     let thrustHistory = [];
@@ -312,6 +314,10 @@
     const HELM_RUDDER_EXPONENT = 0.65;
     const HELM_NEAR_TARGET_DEADBAND_DEG = 0.9;
     const HELM_TURN_RATE_FILTER_ALPHA = 0.35;
+    const HELM_BIAS_INTEGRAL_GAIN = 0.022;
+    const HELM_BIAS_RUDDER_LIMIT = 0.34;
+    const HELM_BIAS_LEARN_ERROR_LIMIT_DEG = 12;
+    const HELM_BIAS_DECAY_PER_SEC = 0.45;
     const HELM_HOLD_STEP_DEG = 2;
     const RUDDER_PHYSICAL_LIMIT = 0.52;
     const RUDDER_COMMAND_LIMIT = 0.52;
@@ -731,9 +737,13 @@
             if (liveHeading !== undefined) {
                 helmHoldHeading = normalizeCompassDegrees(liveHeading);
             }
+            helmLastControlTimeMs = Date.now();
+            helmBiasRudder = 0;
         }
         if (!helmActive) {
             setRudderAngle(0);
+            helmLastControlTimeMs = 0;
+            helmBiasRudder = 0;
         }
         updateHelmStatusUi();
     }
@@ -745,6 +755,8 @@
 
     elHelmModeToggle.addEventListener('click', () => {
         helmMode = (helmMode === 'target') ? 'hold' : 'target';
+        helmBiasRudder = 0;
+        helmLastControlTimeMs = Date.now();
         if (helmMode === 'hold') {
             const liveHeading = readLiveCurrentHeading();
             if (liveHeading !== undefined) {
@@ -831,8 +843,8 @@
 
     function renderTacticalCompass(hdg, trg, apparentWindAngle, worldWindAngle, apparentWindDirection, sail, trgSail) {
         const cx = 65, cy = 65;
-        const outerR = 55;
-        const innerR = 45;
+        const outerR = 63;
+        const innerR = 51;
         compassCtx.clearRect(0, 0, 130, 130);
 
         compassCtx.save();
@@ -852,43 +864,33 @@
         compassCtx.stroke();
         compassCtx.restore();
 
-        compassCtx.beginPath();
-        compassCtx.arc(cx, cy, outerR, 0, 2 * Math.PI);
-        compassCtx.strokeStyle = '#333';
-        compassCtx.lineWidth = 2;
-        compassCtx.stroke();
-
+        // Canvas border is the outer ring; draw one inner ring so segment bands are readable.
         compassCtx.beginPath();
         compassCtx.arc(cx, cy, innerR, 0, 2 * Math.PI);
         compassCtx.strokeStyle = '#2a2a2a';
         compassCtx.lineWidth = 1;
         compassCtx.stroke();
 
-        const drawNeedle = (relativeAngleDegrees, len, color, width, isArrow = false) => {
+        const drawNeedle = (relativeAngleDegrees, len, color, width, startLen = 0) => {
             const rad = (-relativeAngleDegrees - 90) * Math.PI / 180;
+            const sx = cx + startLen * Math.cos(rad);
+            const sy = cy + startLen * Math.sin(rad);
             const tx = cx + len * Math.cos(rad);
             const ty = cy + len * Math.sin(rad);
 
             compassCtx.beginPath();
-            compassCtx.moveTo(cx, cy);
+            compassCtx.moveTo(sx, sy);
             compassCtx.lineTo(tx, ty);
             compassCtx.strokeStyle = color;
             compassCtx.lineWidth = width;
             compassCtx.lineCap = 'round';
             compassCtx.stroke();
-
-            if (isArrow) {
-                compassCtx.beginPath();
-                compassCtx.arc(tx, ty, 3, 0, 2 * Math.PI);
-                compassCtx.fillStyle = color;
-                compassCtx.fill();
-            }
         };
 
         const drawRingAnnotation = (angleDeg, color, label) => {
             const rad = (-angleDeg - 90) * Math.PI / 180;
-            const x1 = cx + innerR * Math.cos(rad);
-            const y1 = cy + innerR * Math.sin(rad);
+            const x1 = cx + (outerR - 10) * Math.cos(rad);
+            const y1 = cy + (outerR - 10) * Math.sin(rad);
             const x2 = cx + outerR * Math.cos(rad);
             const y2 = cy + outerR * Math.sin(rad);
 
@@ -900,7 +902,7 @@
             compassCtx.lineCap = 'round';
             compassCtx.stroke();
 
-            const labelR = outerR + 7;
+            const labelR = outerR - 18;
             const tx = cx + labelR * Math.cos(rad);
             const ty = cy + labelR * Math.sin(rad);
             compassCtx.font = '8px monospace';
@@ -923,19 +925,24 @@
             drawRingAnnotation(worldWindAngle, '#66b3ff', 'W');
         }
 
-        drawNeedle(0, innerR - 2, '#ffffff', 2.5);
+        drawRingAnnotation(0, '#ffffff', 'H');
+
+        // White heading line: first ring -> second ring.
+        drawNeedle(0, outerR, '#ffffff', 2.5, innerR);
 
         if (trg !== undefined) {
             let relativeTargetAngle = trg - currentHdgSafe;
-            drawNeedle(relativeTargetAngle, outerR - 2, '#ffd166', 2);
+            drawRingAnnotation(relativeTargetAngle, '#ffd166', 'T');
+            // Yellow target line: center -> first ring.
+            drawNeedle(relativeTargetAngle, innerR, '#ffd166', 2);
         }
 
         if (worldWindAngle !== undefined) {
-            drawNeedle(worldWindAngle, innerR - 2, '#66b3ff', 1.6, true);
+            drawNeedle(worldWindAngle, outerR, '#66b3ff', 1.6, outerR - 10);
         }
 
         if (apparentWindAngle !== undefined) {
-            drawNeedle(apparentWindAngle, innerR + 1, '#ff66ff', 2, true);
+            drawNeedle(apparentWindAngle, outerR, '#ff66ff', 2, outerR - 10);
         }
 
         if (sail !== undefined && trgSail !== undefined) {
@@ -945,13 +952,8 @@
             let compassTargetSailPos = -trgSail;
 
             drawNeedle(compassSailPos, innerR - 12, '#00ffcc', 3);
-            drawNeedle(compassTargetSailPos, innerR - 12, 'rgba(0, 240, 255, 0.5)', 1.5, true);
+            drawNeedle(compassTargetSailPos, innerR - 12, 'rgba(0, 240, 255, 0.5)', 1.5);
         }
-
-        compassCtx.beginPath();
-        compassCtx.arc(cx, cy, 3, 0, 2 * Math.PI);
-        compassCtx.fillStyle = '#444';
-        compassCtx.fill();
     }
 
     function renderThrustGraph() {
@@ -1219,35 +1221,54 @@
         if (helmActive && currentHeading !== undefined && helmControlTargetHeading !== undefined) {
             let headingError = helmControlTargetHeading - currentHeading;
             headingError = wrapSignedAngleDegrees(headingError);
+            const absHeadingError = Math.abs(headingError);
 
-            if (Math.abs(headingError) < HELM_NEAR_TARGET_DEADBAND_DEG) {
-                helmActionEl.innerText = "On Course";
+            let controlDt = (nowMs - helmLastControlTimeMs) / 1000;
+            if (!Number.isFinite(controlDt) || controlDt <= 0) controlDt = 0.08;
+            controlDt = Math.max(0.02, Math.min(0.25, controlDt));
+            helmLastControlTimeMs = nowMs;
+
+            if (absHeadingError <= HELM_BIAS_LEARN_ERROR_LIMIT_DEG) {
+                helmBiasRudder += HELM_BIAS_INTEGRAL_GAIN * HELM_RUDDER_SIGN * headingError * controlDt;
+                helmBiasRudder = Math.max(-HELM_BIAS_RUDDER_LIMIT, Math.min(HELM_BIAS_RUDDER_LIMIT, helmBiasRudder));
+            } else {
+                const decay = Math.max(0, 1 - (HELM_BIAS_DECAY_PER_SEC * controlDt));
+                helmBiasRudder *= decay;
+            }
+
+            if (absHeadingError < HELM_NEAR_TARGET_DEADBAND_DEG) {
+                const biasCmd = helmBiasRudder;
+                helmActionEl.innerText = `On Course [bias ${biasCmd.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
                 helmActionEl.style.color = '#00ff00';
-                setRudderAngle(0);
+                setRudderAngle(biasCmd);
             } else {
                 const pOutput = HELM_P_GAIN * headingError;
                 const absOutput = Math.abs(pOutput);
                 const outputRatio = Math.min(1, absOutput / HELM_P_OUTPUT_FOR_MAX);
                 const curvedRatio = Math.pow(outputRatio, HELM_RUDDER_EXPONENT);
-                const rudderCmd = HELM_RUDDER_SIGN * Math.sign(pOutput) * curvedRatio;
+                const pRudderCmd = HELM_RUDDER_SIGN * Math.sign(pOutput) * curvedRatio;
+                const rudderCmd = pRudderCmd + helmBiasRudder;
 
                 if (pOutput > 0) {
-                    helmActionEl.innerText = `P Left [rudder ${rudderCmd.toFixed(2)} | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
+                    helmActionEl.innerText = `P Left [rudder ${rudderCmd.toFixed(2)} | p ${pRudderCmd.toFixed(2)} | b ${helmBiasRudder.toFixed(2)} | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
                     helmActionEl.style.color = '#3399ff';
                 } else {
-                    helmActionEl.innerText = `P Right [rudder ${rudderCmd.toFixed(2)} | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
+                    helmActionEl.innerText = `P Right [rudder ${rudderCmd.toFixed(2)} | p ${pRudderCmd.toFixed(2)} | b ${helmBiasRudder.toFixed(2)} | out ${pOutput.toFixed(2)} | r ${helmTurnRateDps.toFixed(1)}]`;
                     helmActionEl.style.color = '#ffd166';
                 }
                 setRudderAngle(rudderCmd);
             }
         } else if (helmActive) {
             setRudderAngle(0);
+            helmLastControlTimeMs = 0;
             helmActionEl.innerText = (helmMode === 'hold') ? "Waiting for Hold Heading..." : "Waiting for Race Target...";
             helmActionEl.style.color = '#666';
         } else {
             helmLastHeadingUnwrapped = null;
             helmLastSampleTimeMs = 0;
             helmTurnRateDps = 0;
+            helmLastControlTimeMs = 0;
+            helmBiasRudder = 0;
             helmActionEl.innerText = (helmControlTargetHeading === undefined)
                 ? ((helmMode === 'hold') ? "Waiting for Hold Heading..." : "Waiting for Race Target...")
                 : "Disabled";
